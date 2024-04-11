@@ -2,26 +2,36 @@
 aws:
   region: us-east-1
   # execution role, replace the role name below with the one you are using
-  sagemaker_execution_role_name: <your-role-name>
+  sagemaker_execution_role_name: service-role/AmazonSageMaker-ExecutionRole-20220504T122644
   # the execution role ARN is determined automatically by the code
   sagemaker_execution_role_arn: arn:aws:iam::{account_id}:role/{role}
-  # s3_bucket: sagemaker-{region}-{account_id} # region and account id are automatically replaced
+  s3_bucket: sagemaker-{region}-{account_id} # region and account id are automatically replaced
   s3_prefix: mlops-pipeline
   network_config:
       enable_network_isolation: false
       security_group_ids: 
-      - <security_group_id>
+      # - sg-08467ed752add3e55
       subnets:
-      - <subnet-1>
-      - <subnet-2>
-      - <subnet-3>
+      # - subnet-05e82e12d5f1a7964
+      # - subnet-0b44df2a2870a053f
+      # - subnet-0af8aad6d07fe9911
+      # - subnet-00bbccd96753a202f
+      # - subnet-03f4f049c9b7150fc
+      # - subnet-02d9f596b83cc35fd
+
+# presto:
+#   host: <0.0.0.0>
+#   parameter: "0000
+#   presto_credentials: <presto_credentials>
+#   catalog: <catalog>
+#   schema: <schema>
 
 presto:
-  host: <0.0.0.0>
-  parameter: "0000"
-  presto_credentials: <presto_credentials>
-  catalog: <catalog>
-  schema: <schema>
+  host: 54.236.14.197
+  parameter: "8080"
+  presto_credentials: presto-credentials
+  catalog: tpch
+  schema: tiny
   
 ## User needs to configure the following
 pipeline:
@@ -33,15 +43,15 @@ pipeline:
     Value: my-team
   
 training_step:
-  training_target: is_true ## target name (the ML model is trained to predict this column)
+  training_target: high_value_order ## target name (the ML model is trained to predict this column)
   training_features:
-  - feature_1
-  - feature_2
-  - feature_3
+  - total_extended_price
+  - avg_discount
+  - total_quantity ##, feature2, feature2, ... add more based on your training job, add more features here
   sklearn_framework_version: 0.23-1
   n_estimators: 75
   max_depth: 10
-  min_samples_split: 100
+  min_samples_split: 2
   max_features: sqrt
   instance_type: ml.m5.xlarge
   instance_count: 1
@@ -51,26 +61,29 @@ training_step:
   tags:
   - Key: team
     Value: my-team
-
-  query_true: |
-    -- TRUE START
-    SELECT feature_1, feature_2, feature_3, is_true
-    FROM feature_table_true
-    WHERE
-        data_load_date >= date('{s_date}') and data_load_date <= date('{e_date}')
-        AND created_at >= date_parse('{start}', '%Y-%m-%d %H:%i:%s')
-        {end}
-    -- TRUE END
-    
-  query_non_true: |
-    -- NON-TRUE START
-    SELECT feature_1, feature_2, feature_3, is_true
-    FROM feature_table_non_true
-    WHERE
-        data_load_date >= date('{s_date}') and data_load_date <= date('{e_date}')
-        AND created_at >= date_parse('{start}', '%Y-%m-%d %H:%i:%s')
-        {end}
-    -- NON-TRUE END
+  query: |
+    SELECT
+        o.orderkey,
+        COUNT(l.linenumber) AS lineitem_count,
+        SUM(l.quantity) AS total_quantity,
+        AVG(l.discount) AS avg_discount,
+        SUM(l.extendedprice) AS total_extended_price,
+        SUM(l.tax) AS total_payable_tax,
+        o.orderpriority,
+        CASE
+            WHEN (o.orderpriority = '2-HIGH') THEN 1
+            ELSE 0
+        END AS high_value_order
+    FROM
+        orders o
+    JOIN
+        lineitem l ON o.orderkey = l.orderkey
+    GROUP BY
+        o.orderkey,
+        o.orderpriority
+    ORDER BY 
+        RANDOM() 
+    LIMIT 5000
 
 tuning_step:
   step_name: Train-And-Tune-Model
@@ -84,8 +97,8 @@ tuning_step:
     - 3
     - 20
     min_samples_split:
-    - 20
-    - 100
+    - 2
+    - 10
     max_features:
     - sqrt
     - log2
@@ -96,7 +109,7 @@ tuning_step:
 
 evaluation_step:
   step_name: Evaluate-Model
-  accuracy_condition_threshold: 0.7
+  accuracy_condition_threshold: 0.62
   instance_type: ml.m5.xlarge
   instance_count: 1
   evaluation_filename: evaluation.json
@@ -111,12 +124,28 @@ transform_step:
   - Key: team
     Value: my-team
   query: |
-  SELECT feature_1, feature_2, feature_3, is_true
-  FROM feature_table_inference
-  WHERE
-      data_load_date >= date('{s_date}') and data_load_date <= date('{e_date}')
-      AND created_at >= date_parse('{start}', '%Y-%m-%d %H:%i:%s')
-      {end}
+    SELECT
+        o.orderkey,
+        COUNT(l.linenumber) AS lineitem_count,
+        SUM(l.quantity) AS total_quantity,
+        AVG(l.discount) AS avg_discount,
+        SUM(l.extendedprice) AS total_extended_price,
+        SUM(l.tax) AS total_payable_tax,
+        o.orderpriority,
+        CASE
+            WHEN (o.orderpriority = '2-HIGH') THEN 1
+            ELSE 0
+        END AS high_value_order
+    FROM
+        orders o
+    JOIN
+        lineitem l ON o.orderkey = l.orderkey
+    GROUP BY
+        o.orderkey,
+        o.orderpriority
+    ORDER BY 
+        RANDOM() 
+    LIMIT 5000
 
 data_processing_step:
   step_name: "Preprocess-Data"

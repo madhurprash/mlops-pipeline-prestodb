@@ -27,7 +27,7 @@ def train_and_evaluate(features, target, model_dir):
     # Paths are set based on the input channels names provided in the TrainingInput configuration
     train_data_path = os.path.join(os.getenv('SM_CHANNEL_TRAIN'), 'train.csv')
     logger.info(f"training path stored by the pipeline step .... {train_data_path}...")
-    
+  
     test_data_path = os.path.join(os.getenv('SM_CHANNEL_TEST'), 'test.csv')
     logger.info(f"test data path stored by the pipeline step .... {test_data_path}...")
 
