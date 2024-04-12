@@ -69,6 +69,7 @@ training_step:
         AVG(l.discount) AS avg_discount,
         SUM(l.extendedprice) AS total_extended_price,
         SUM(l.tax) AS total_payable_tax,
+        o.orderdate,
         o.orderpriority,
         CASE
             WHEN (o.orderpriority = '2-HIGH') THEN 1
@@ -80,6 +81,7 @@ training_step:
         lineitem l ON o.orderkey = l.orderkey
     GROUP BY
         o.orderkey,
+        o.orderdate,
         o.orderpriority
     ORDER BY 
         RANDOM() 
@@ -131,6 +133,7 @@ transform_step:
         AVG(l.discount) AS avg_discount,
         SUM(l.extendedprice) AS total_extended_price,
         SUM(l.tax) AS total_payable_tax,
+        o.orderdate,
         o.orderpriority,
         CASE
             WHEN (o.orderpriority = '2-HIGH') THEN 1
@@ -142,6 +145,7 @@ transform_step:
         lineitem l ON o.orderkey = l.orderkey
     GROUP BY
         o.orderkey,
+        o.orderdate,
         o.orderpriority
     ORDER BY 
         RANDOM() 
