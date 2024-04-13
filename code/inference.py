@@ -18,7 +18,6 @@ def model_fn(model_dir):
     logger.info("Loading model.")
     model_path = os.path.join(model_dir, "model.joblib")
     model = joblib.load(model_path)
-    
     logger.info("Loading model configuration.")
     config_path = os.path.join(model_dir, "config.json")
     with open(config_path, 'r') as f:
@@ -26,7 +25,6 @@ def model_fn(model_dir):
     
     # # Attach config to the model object
     model.features = config.get('FEATURES')
-    
     return model
 
 def input_fn(input_data, content_type):
